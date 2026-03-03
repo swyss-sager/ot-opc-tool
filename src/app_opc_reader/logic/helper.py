@@ -29,6 +29,11 @@ def ensure_aware_utc(ts: dt.datetime) -> dt.datetime:
     return ts.astimezone(dt.timezone.utc)
 
 
+def local_tz(utc_offset_hours: float) -> dt.timezone:
+    """Erstellt eine einfache fixed-offset Timezone — kein tzdata nötig."""
+    return dt.timezone(dt.timedelta(hours=utc_offset_hours))
+
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -70,9 +75,7 @@ def require_env(env: Dict[str, str], key: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────
-#  Datum-Parser für mode="absolute"
-#  KEIN ZoneInfo, KEIN tzdata — nur Python stdlib
-#  Datum wird direkt als UTC behandelt
+#  Datum-Parser — mit UTC-Offset-Support, kein tzdata
 # ─────────────────────────────────────────────────────────────
 
 _DATE_RE = re.compile(
@@ -81,17 +84,20 @@ _DATE_RE = re.compile(
 )
 
 
-def _parse_de_datetime(s: str) -> Tuple[dt.datetime, bool]:
+def _parse_de_datetime(
+    s: str,
+    tz: dt.timezone,
+) -> Tuple[dt.datetime, bool]:
     """
-    Gibt (datetime_utc, has_time) zurück.
-    has_time=False  → nur Datum, keine Uhrzeit angegeben.
+    Parst dd.mm.yyyy [HH:MM[:SS]] oder 'heute'/'today'.
+    Gibt (datetime_aware_local, has_time) zurück.
     """
     s = s.strip()
 
     if s.lower() in {"heute", "today"}:
         d = dt.date.today()
         return (
-            dt.datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=dt.timezone.utc),
+            dt.datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=tz),
             False,
         )
 
@@ -111,7 +117,7 @@ def _parse_de_datetime(s: str) -> Tuple[dt.datetime, bool]:
     has_time = m.group(4) is not None
 
     return (
-        dt.datetime(year, month, day, hh, mm_, ss, tzinfo=dt.timezone.utc),
+        dt.datetime(year, month, day, hh, mm_, ss, tzinfo=tz),
         has_time,
     )
 
@@ -120,18 +126,28 @@ def parse_absolute_range(
     start_text: str,
     end_text: str,
     end_inclusive: bool = True,
+    utc_offset_hours: float = 0.0,
 ) -> Tuple[dt.datetime, dt.datetime]:
     """
-    Parst start/end → (start_utc, end_utc) aware UTC.
-    Kein Timezone-Handling — direkt UTC.
+    Parst start/end als Lokalzeit → konvertiert zu UTC.
+
+    Beispiel mit utc_offset_hours=1:
+      '01.02.2026 00:00:00 CET'  →  '2026-01-31T23:00:00+00:00' UTC
+      'heute 23:59:59 CET'       →  'heute 22:59:59+00:00' UTC
     """
-    start_utc, _            = _parse_de_datetime(start_text)
-    end_utc,   end_has_time = _parse_de_datetime(end_text)
+    tz = local_tz(utc_offset_hours)
+
+    start_local, _            = _parse_de_datetime(start_text, tz)
+    end_local,   end_has_time = _parse_de_datetime(end_text,   tz)
 
     if end_inclusive and not end_has_time:
-        end_utc = end_utc.replace(
+        end_local = end_local.replace(
             hour=23, minute=59, second=59, microsecond=999999
         )
+
+    # Lokalzeit → UTC
+    start_utc = start_local.astimezone(dt.timezone.utc)
+    end_utc   = end_local.astimezone(dt.timezone.utc)
 
     if start_utc > end_utc:
         raise ValueError(
