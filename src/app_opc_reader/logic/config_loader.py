@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from src.app_opc_reader.logic.helper import repo_root
+from src.app_opc_reader.logic.helper import  project_root
 
 
 class ConfigLoader:
     def __init__(self) -> None:
-        root = repo_root()
+        root = project_root()
         self.config_path = (root / "config" / "config.json").resolve()
 
     def load(self) -> Dict[str, Any]:

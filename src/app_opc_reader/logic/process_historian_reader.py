@@ -41,16 +41,21 @@ class SiemensHistorianOpcUaClient:
         self.application_uri = application_uri
 
         self.client_cert_path = self.pki_dir / "own" / "certs" / "client_cert.der"
-        self.client_key_path = self.pki_dir / "own" / "private" / "client_key.pem"
+        self.client_key_path  = self.pki_dir / "own" / "private" / "client_key.pem"
 
-        self.security_string = f"{security_policy},{message_security_mode},{self.client_cert_path},{self.client_key_path}"
+        self.security_string = (
+            f"{security_policy},{message_security_mode},"
+            f"{self.client_cert_path},{self.client_key_path}"
+        )
         self._client: Optional[Client] = None
 
+    # ── PKI ────────────────────────────────────────────────────────────────
+
     def _ensure_pki_folders(self) -> None:
-        (self.pki_dir / "own" / "certs").mkdir(parents=True, exist_ok=True)
-        (self.pki_dir / "own" / "private").mkdir(parents=True, exist_ok=True)
-        (self.pki_dir / "trusted" / "certs").mkdir(parents=True, exist_ok=True)
-        (self.pki_dir / "rejected" / "certs").mkdir(parents=True, exist_ok=True)
+        (self.pki_dir / "own"      / "certs"  ).mkdir(parents=True, exist_ok=True)
+        (self.pki_dir / "own"      / "private").mkdir(parents=True, exist_ok=True)
+        (self.pki_dir / "trusted"  / "certs"  ).mkdir(parents=True, exist_ok=True)
+        (self.pki_dir / "rejected" / "certs"  ).mkdir(parents=True, exist_ok=True)
 
     def trusted_certs_dir(self) -> Path:
         self._ensure_pki_folders()
@@ -61,81 +66,70 @@ class SiemensHistorianOpcUaClient:
         try:
             cert = x509.load_der_x509_certificate(cert_der)
             try:
-                san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-            except (Exception,):
+                san = cert.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName).value
+            except Exception:
                 return False
-            uris = san.get_values_for_type(x509.UniformResourceIdentifier)
-            return app_uri in uris
-        except (Exception,):
+            return app_uri in san.get_values_for_type(
+                x509.UniformResourceIdentifier)
+        except Exception:
             return False
 
-    def ensure_client_certificate(self, common_name: str = "Python OPC UA Client") -> Tuple[Path, Path]:
-        """
-        Wichtig: Wenn Zertifikat existiert, aber NICHT zur application_uri passt,
-        wird es automatisch neu erzeugt (sonst BadCertificateUriInvalid).
-        """
+    def ensure_client_certificate(
+            self, common_name: str = "Python OPC UA Client"
+    ) -> Tuple[Path, Path]:
         self._ensure_pki_folders()
 
         if self.client_cert_path.exists() and self.client_key_path.exists():
-            cert_der = self.client_cert_path.read_bytes()
-            if self._cert_contains_app_uri(cert_der, self.application_uri):
+            if self._cert_contains_app_uri(
+                    self.client_cert_path.read_bytes(), self.application_uri):
                 return self.client_cert_path, self.client_key_path
-
-            # Regenerate if URI mismatch
             self.client_cert_path.unlink(missing_ok=True)
             self.client_key_path.unlink(missing_ok=True)
 
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME,        common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME,  "Local"),
+        ])
+        now_naive = aware_utc_now().replace(tzinfo=None)
 
-        subject = issuer = x509.Name(
-            [
-                x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Local"),
-            ]
-        )
-
-        now_naive_utc = aware_utc_now().replace(tzinfo=None)
-
-        cert_builder = (
+        cert = (
             x509.CertificateBuilder()
             .subject_name(subject)
             .issuer_name(issuer)
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
-            .not_valid_before(now_naive_utc - dt.timedelta(minutes=5))
-            .not_valid_after(now_naive_utc + dt.timedelta(days=3650))
+            .not_valid_before(now_naive - dt.timedelta(minutes=5))
+            .not_valid_after (now_naive + dt.timedelta(days=3650))
             .add_extension(
-                x509.SubjectAlternativeName([x509.UniformResourceIdentifier(self.application_uri)]),
-                critical=False,
-            )
+                x509.SubjectAlternativeName(
+                    [x509.UniformResourceIdentifier(self.application_uri)]),
+                critical=False)
             .add_extension(
                 x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]),
-                critical=False,
-            )
+                critical=False)
+            .sign(private_key=key, algorithm=hashes.SHA256())
         )
 
-        cert = cert_builder.sign(private_key=key, algorithm=hashes.SHA256())
-
-        self.client_key_path.write_bytes(
-            key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption(),
-            )
-        )
-        self.client_cert_path.write_bytes(cert.public_bytes(serialization.Encoding.DER))
+        self.client_key_path.write_bytes(key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption(),
+        ))
+        self.client_cert_path.write_bytes(
+            cert.public_bytes(serialization.Encoding.DER))
         return self.client_cert_path, self.client_key_path
+
+    # ── Connect / Disconnect ───────────────────────────────────────────────
 
     async def connect(self) -> None:
         self.ensure_client_certificate()
-
         client = Client(url=self.endpoint_url, timeout=self.timeout_s)
         client.application_uri = self.application_uri
-
         await client.set_security_string(self.security_string)
         client.set_user(self.username)
         client.set_password(self.password)
-
         await client.connect()
         self._client = client
 
@@ -146,27 +140,27 @@ class SiemensHistorianOpcUaClient:
             finally:
                 self._client = None
 
+    # ── Debug ──────────────────────────────────────────────────────────────
+
     async def debug_history_capabilities(self, node_id: str) -> None:
         if self._client is None:
             raise RuntimeError("Not connected.")
-
         node = self._client.get_node(node_id)
         print("\n--- DEBUG: Node capabilities ---")
         print("NodeId:", node_id)
-
         try:
             dv = await node.read_attribute(ua.AttributeIds.Historizing)
             print("Historizing attribute:", dv.Value.Value)
         except Exception as e:
             print("Could not read Historizing attribute:", repr(e))
-
         try:
             v = await node.read_value()
             print("Current value (read_value):", v)
         except Exception as e:
             print("Could not read current value:", repr(e))
-
         print("--- DEBUG: end ---\n")
+
+    # ── Raw history (single call) ──────────────────────────────────────────
 
     async def read_history_raw(
             self,
@@ -180,27 +174,23 @@ class SiemensHistorianOpcUaClient:
             raise RuntimeError("Not connected.")
 
         node = self._client.get_node(node_id)
-        start_time_utc = to_naive_utc(start_time_utc)
-        end_time_utc = to_naive_utc(end_time_utc)
-
-        dvs = await node.read_raw_history(
-            starttime=start_time_utc,
-            endtime=end_time_utc,
+        dvs  = await node.read_raw_history(
+            starttime=to_naive_utc(start_time_utc),
+            endtime=to_naive_utc(end_time_utc),
             numvalues=num_values,
             return_bounds=return_bounds,
         )
-
-        out: List[HistoryValue] = []
-        for dv in dvs:
-            out.append(
-                HistoryValue(
-                    source_timestamp=dv.SourceTimestamp,
-                    server_timestamp=dv.ServerTimestamp,
-                    value=dv.Value.Value if dv.Value is not None else None,
-                    status_code=str(dv.StatusCode),
-                )
+        return [
+            HistoryValue(
+                source_timestamp=dv.SourceTimestamp,
+                server_timestamp=dv.ServerTimestamp,
+                value=dv.Value.Value if dv.Value is not None else None,
+                status_code=str(dv.StatusCode),
             )
-        return out
+            for dv in dvs
+        ]
+
+    # ── Paged history ──────────────────────────────────────────────────────
 
     async def read_history_raw_paged(
             self,
@@ -209,22 +199,30 @@ class SiemensHistorianOpcUaClient:
             end_time_utc: dt.datetime,
             page_size: int = 10000,
             return_bounds: bool = False,
-            max_pages: int = 100000,
+            max_pages: int = 100_000,
     ) -> List[HistoryValue]:
         """
-        Lückenfreies Paging:
-        - KEIN +1µs (das kann Werte mit identischem Timestamp überspringen)
-        - Stattdessen: Start = last_ts und am Anfang der nächsten Seite alles <= last_ts verwerfen
-        - Abbruch, wenn kein Fortschritt mehr möglich ist
+        Vollständiges, lückenfreies Paging über den gesamten Zeitbereich.
+
+        Abbruchbedingungen (in Priorität):
+          1. Leerer Batch vom Server
+          2. Kein Fortschritt im Timestamp (Endlos-Loop-Schutz)
+          3. current_start > end_utc
+          4. max_pages erreicht
+
+        ENTFERNT: `if len(batch) < page_size: break`
+        → Der Server darf jederzeit weniger als page_size liefern,
+          ohne dass das Ende des Datensatzes erreicht ist.
         """
         start = ensure_aware_utc(start_time_utc)
-        end = ensure_aware_utc(end_time_utc)
+        end   = ensure_aware_utc(end_time_utc)
 
         all_values: List[HistoryValue] = []
         current_start = start
         last_ts: Optional[dt.datetime] = None
+        page_idx = 0
 
-        for page_idx in range(max_pages):
+        while page_idx < max_pages:
             if current_start > end:
                 break
 
@@ -236,53 +234,52 @@ class SiemensHistorianOpcUaClient:
                 return_bounds=return_bounds if page_idx == 0 else False,
             )
 
+            # ── Abbruch 1: Server liefert nichts mehr ─────────────────
             if not batch:
                 break
 
-            # Wenn wir schon Daten haben: alles entfernen, was <= last_ts ist (Dedup/Progress)
+            # ── Deduplizierung: alles <= last_ts verwerfen ─────────────
             if last_ts is not None:
-                filtered: List[HistoryValue] = []
-                for hv in batch:
-                    if hv.source_timestamp is None:
-                        # selten, aber: ohne ts können wir nicht sauber paginieren
-                        # -> behalten, sonst potentiell Datenverlust
-                        filtered.append(hv)
-                        continue
-                    ts = ensure_aware_utc(hv.source_timestamp)
-                    if ts > last_ts:
-                        filtered.append(hv)
-
-                batch = filtered
+                batch = [
+                    hv for hv in batch
+                    if hv.source_timestamp is None
+                    or ensure_aware_utc(hv.source_timestamp) > last_ts
+                ]
+                # ── Abbruch 2: kein Fortschritt ───────────────────────
                 if not batch:
-                    # Kein Fortschritt => abbrechen, sonst Endlosschleife
                     break
 
             all_values.extend(batch)
 
-            # neuen last_ts bestimmen (letzter gültiger SourceTimestamp)
-            new_last_ts = None
+            # ── Neuen last_ts bestimmen ────────────────────────────────
+            new_last_ts: Optional[dt.datetime] = None
             for hv in reversed(batch):
                 if hv.source_timestamp is not None:
                     new_last_ts = ensure_aware_utc(hv.source_timestamp)
                     break
 
             if new_last_ts is None:
-                # Ohne Timestamp können wir nicht weiter paginieren
-                break
+                break  # Kein Timestamp → können nicht weiter paginieren
 
-            # Fortschritt prüfen
+            # ── Abbruch 3: Timestamp-Stillstand ───────────────────────
             if last_ts is not None and new_last_ts <= last_ts:
                 break
 
-            last_ts = new_last_ts
-            current_start = last_ts  # bewusst ohne +epsilon
+            last_ts       = new_last_ts
+            current_start = last_ts   # bewusst ohne +epsilon
+            page_idx     += 1
 
-            # Wenn Server weniger als page_size liefert, sind wir i.d.R. am Ende
-            if len(batch) < page_size:
-                break
+            print(
+                f"  [Paging] Seite {page_idx:>4} | "
+                f"Batch {len(batch):>6} | "
+                f"Gesamt {len(all_values):>8} | "
+                f"bis {last_ts.isoformat()}"
+            )
 
         return all_values
 
+
+# ── Event-Loop Helper ──────────────────────────────────────────────────────
 
 class _LoopRunner:
     def __init__(self) -> None:
@@ -307,19 +304,17 @@ class _LoopRunner:
             for t in pending:
                 t.cancel()
             if pending:
-                self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                self._loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True))
         finally:
             self._loop.close()
             self._loop = None
 
 
+# ── Sync Facade ────────────────────────────────────────────────────────────
+
 class ProcessHistorianReader:
-    """
-    Konsolidierter Sync-Facade:
-      - ein Event-Loop pro Instanz
-      - connect/debug/read/disconnect im selben Loop
-      - Bounds-Probe vorhanden
-    """
+    """Sync-Wrapper um SiemensHistorianOpcUaClient — ein Loop pro Instanz."""
 
     def __init__(
             self,
@@ -333,11 +328,10 @@ class ProcessHistorianReader:
             message_security_mode: str = "SignAndEncrypt",
             timeout_s: int = 30,
     ) -> None:
-        self.node_id = node_id
-        self._loop = _LoopRunner()
+        self.node_id    = node_id
+        self._loop      = _LoopRunner()
         self._connected = False
-
-        self._client = SiemensHistorianOpcUaClient(
+        self._client    = SiemensHistorianOpcUaClient(
             endpoint_url=endpoint_url,
             username=username,
             password=password,
@@ -379,7 +373,12 @@ class ProcessHistorianReader:
     def debug_node(self) -> None:
         self._loop.run(self._client.debug_history_capabilities(self.node_id))
 
-    def read_history_paged(self, start_utc: dt.datetime, end_utc: dt.datetime, page_size: int) -> List[HistoryValue]:
+    def read_history_paged(
+            self,
+            start_utc: dt.datetime,
+            end_utc: dt.datetime,
+            page_size: int,
+    ) -> List[HistoryValue]:
         return self._loop.run(
             self._client.read_history_raw_paged(
                 node_id=self.node_id,
@@ -390,8 +389,10 @@ class ProcessHistorianReader:
             )
         )
 
-    def probe_bounds_last_value(self, probe_minutes: int = 30) -> Optional[HistoryValue]:
-        end_utc = aware_utc_now()
+    def probe_bounds_last_value(
+            self, probe_minutes: int = 30
+    ) -> Optional[HistoryValue]:
+        end_utc   = aware_utc_now()
         start_utc = end_utc - dt.timedelta(minutes=probe_minutes)
         hist = self._loop.run(
             self._client.read_history_raw(
