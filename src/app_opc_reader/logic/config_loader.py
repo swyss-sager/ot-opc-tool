@@ -2,13 +2,13 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from src.app.logic.helper import project_root
+from src.app_opc_reader.logic.helper import repo_root
 
 
 class ConfigLoader:
-    def __init__(self, config_path: Optional[Path] = None) -> None:
-        root = project_root()
-        self.config_path = (config_path or (root / "config" / "config.json")).resolve()
+    def __init__(self) -> None:
+        root = repo_root()
+        self.config_path = (root / "config" / "config.json").resolve()
 
     def load(self) -> Dict[str, Any]:
         if not self.config_path.exists():

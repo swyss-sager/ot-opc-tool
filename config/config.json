@@ -3,19 +3,15 @@
     "endpoint_url": "opc.tcp://SagerPH:4852",
     "node_id": "ns=4;b=0/nBV4EbqkmuZ6HkwVRlXYkGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACm0yC56pZ0RZeVuxSOVFGMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAA==",
     "tag_description": "Aussen-Temperatur",
-
     "application_uri": "urn:python:opcua:siemens-historian",
     "security_policy": "Basic128Rsa15",
     "message_security_mode": "SignAndEncrypt",
-
     "timeout_s": 30,
     "page_size": 10000,
-
     "range": {
       "mode": "last_minutes",
       "last_minutes": 1440
     },
-
     "fallback": {
       "enabled": true,
       "probe_minutes": 30,

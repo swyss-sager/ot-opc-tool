@@ -2,22 +2,22 @@ import datetime as dt
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from src.app.logic.config_loader import ConfigLoader
-from src.app.logic.helper import aware_utc_now, ensure_aware_utc, load_env_file, require_env, project_root
-from src.app.logic.history_exporter import HistoryDataExporter
-from src.app.logic.process_historian_reader import ProcessHistorianReader
+from src.app_opc_reader.logic.config_loader import ConfigLoader
+from src.app_opc_reader.logic.helper import aware_utc_now, ensure_aware_utc, load_env_file, require_env, repo_root
+from src.app_opc_reader.logic.history_exporter import HistoryDataExporter
+from src.app_opc_reader.logic.process_historian_reader import ProcessHistorianReader
 
 
 class ProcessHistorianRunner:
     def __init__(self) -> None:
-        root = project_root()
-        self.cfg = ConfigLoader(root / "config" / "config.json").load()
+        self.cfg = ConfigLoader().load()
 
-        env = load_env_file(root / "security" / ".env")
+        env = load_env_file()
         self.username = require_env(env, "SAGERPH_USERNAME")
         self.password = env.get("SAGERPH_PASSWORD", "")
 
-    def _compute_range(self, ph_cfg: Dict[str, Any]) -> Tuple[dt.datetime, dt.datetime]:
+    @staticmethod
+    def _compute_range(ph_cfg: Dict[str, Any]) -> Tuple[dt.datetime, dt.datetime]:
         r = ph_cfg.get("range", {"mode": "last_minutes", "last_minutes": 1440})
         mode = r.get("mode", "last_minutes")
         end_utc = aware_utc_now()
@@ -29,7 +29,7 @@ class ProcessHistorianRunner:
         raise ValueError(f"Unsupported range.mode: {mode}")
 
     def run(self, debug: bool = True) -> dict:
-        root = project_root()
+        root = repo_root()
         ph_cfg: Dict[str, Any] = self.cfg["process_historian"]
         ex_cfg: Dict[str, Any] = self.cfg.get("export", {})
 
@@ -41,7 +41,7 @@ class ProcessHistorianRunner:
         start_utc, end_utc = self._compute_range(ph_cfg)
         start_utc, end_utc = ensure_aware_utc(start_utc), ensure_aware_utc(end_utc)
 
-        exporter = HistoryDataExporter(data_dir=Path(ex_cfg.get("data_dir", "data")))
+        exporter = HistoryDataExporter()
 
         reader = ProcessHistorianReader(
             endpoint_url=endpoint_url,

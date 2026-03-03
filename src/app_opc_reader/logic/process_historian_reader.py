@@ -1,7 +1,7 @@
 import asyncio
 import datetime as dt
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from asyncua import Client, ua
 from cryptography import x509
@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from src.app.logic.helper import (
+from src.app_opc_reader.logic.helper import (
     HistoryValue,
     aware_utc_now,
     ensure_aware_utc,
@@ -19,15 +19,15 @@ from src.app.logic.helper import (
 
 class SiemensHistorianOpcUaClient:
     def __init__(
-        self,
-        endpoint_url: str,
-        username: str,
-        password: str,
-        pki_dir: Path,
-        application_uri: str,
-        security_policy: str = "Basic128Rsa15",
-        message_security_mode: str = "SignAndEncrypt",
-        timeout_s: int = 30,
+            self,
+            endpoint_url: str,
+            username: str,
+            password: str,
+            pki_dir: Path,
+            application_uri: str,
+            security_policy: str = "Basic128Rsa15",
+            message_security_mode: str = "SignAndEncrypt",
+            timeout_s: int = 30,
     ) -> None:
         if not application_uri:
             raise ValueError("application_uri must not be empty/None")
@@ -56,16 +56,17 @@ class SiemensHistorianOpcUaClient:
         self._ensure_pki_folders()
         return (self.pki_dir / "trusted" / "certs").resolve()
 
-    def _cert_contains_app_uri(self, cert_der: bytes, app_uri: str) -> bool:
+    @staticmethod
+    def _cert_contains_app_uri(cert_der: bytes, app_uri: str) -> bool:
         try:
             cert = x509.load_der_x509_certificate(cert_der)
             try:
                 san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-            except Exception:
+            except (Exception,):
                 return False
             uris = san.get_values_for_type(x509.UniformResourceIdentifier)
             return app_uri in uris
-        except Exception:
+        except (Exception,):
             return False
 
     def ensure_client_certificate(self, common_name: str = "Python OPC UA Client") -> Tuple[Path, Path]:
@@ -78,7 +79,7 @@ class SiemensHistorianOpcUaClient:
         if self.client_cert_path.exists() and self.client_key_path.exists():
             cert_der = self.client_cert_path.read_bytes()
             if self._cert_contains_app_uri(cert_der, self.application_uri):
-                return (self.client_cert_path, self.client_key_path)
+                return self.client_cert_path, self.client_key_path
 
             # Regenerate if URI mismatch
             self.client_cert_path.unlink(missing_ok=True)
@@ -123,7 +124,7 @@ class SiemensHistorianOpcUaClient:
             )
         )
         self.client_cert_path.write_bytes(cert.public_bytes(serialization.Encoding.DER))
-        return (self.client_cert_path, self.client_key_path)
+        return self.client_cert_path, self.client_key_path
 
     async def connect(self) -> None:
         self.ensure_client_certificate()
@@ -168,12 +169,12 @@ class SiemensHistorianOpcUaClient:
         print("--- DEBUG: end ---\n")
 
     async def read_history_raw(
-        self,
-        node_id: str,
-        start_time_utc: dt.datetime,
-        end_time_utc: dt.datetime,
-        num_values: int = 0,
-        return_bounds: bool = False,
+            self,
+            node_id: str,
+            start_time_utc: dt.datetime,
+            end_time_utc: dt.datetime,
+            num_values: int = 0,
+            return_bounds: bool = False,
     ) -> List[HistoryValue]:
         if self._client is None:
             raise RuntimeError("Not connected.")
@@ -200,7 +201,6 @@ class SiemensHistorianOpcUaClient:
                 )
             )
         return out
-
 
     async def read_history_raw_paged(
             self,
@@ -320,17 +320,18 @@ class ProcessHistorianReader:
       - connect/debug/read/disconnect im selben Loop
       - Bounds-Probe vorhanden
     """
+
     def __init__(
-        self,
-        endpoint_url: str,
-        node_id: str,
-        username: str,
-        password: str,
-        pki_dir: Path,
-        application_uri: str,
-        security_policy: str = "Basic128Rsa15",
-        message_security_mode: str = "SignAndEncrypt",
-        timeout_s: int = 30,
+            self,
+            endpoint_url: str,
+            node_id: str,
+            username: str,
+            password: str,
+            pki_dir: Path,
+            application_uri: str,
+            security_policy: str = "Basic128Rsa15",
+            message_security_mode: str = "SignAndEncrypt",
+            timeout_s: int = 30,
     ) -> None:
         self.node_id = node_id
         self._loop = _LoopRunner()

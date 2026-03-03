@@ -28,20 +28,17 @@ def ensure_aware_utc(ts: dt.datetime) -> dt.datetime:
     return ts.astimezone(dt.timezone.utc)
 
 
-def project_root() -> Path:
-    """
-    Sucht nach dem Projekt-Root, indem nach einem 'config' Ordner gesucht wird.
-    """
-    p = Path(__file__).resolve()
-    for parent in [p, *p.parents]:
-        if (parent / "config").exists():
-            return parent
-    # Fallback: 3 Ebenen hoch (src/app/logic -> src)
+def repo_root() -> Path:
+    # Fallback: 3 Ebenen hoch (src/app*/logic -> repo-root)
     return Path(__file__).resolve().parents[3]
 
 
-def load_env_file(env_path: Path) -> Dict[str, str]:
+def load_env_file() -> Dict[str, str]:
     env: Dict[str, str] = {}
+    #
+    root = repo_root()
+    env_path = (root / "security"/".env").resolve()
+    #
     if not env_path.exists():
         raise FileNotFoundError(f".env file not found: {env_path}")
 

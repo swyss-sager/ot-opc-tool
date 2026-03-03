@@ -1,17 +1,15 @@
-import asyncio
-
-from src.app.logic.process_historian_reader import ProcessHistorianReader
-from src.app.logic.wincc_opc_ua_reader import WinCCOpcUaReader
+from src.app_opc_reader.logic.process_historian_runner import ProcessHistorianRunner
+from src.app_opc_reader.logic.wincc_opc_ua_reader import WinCCOpcUaReader
 
 if __name__ == "__main__":
-    do_winCC:bool = False
-    do_PH:bool = True
+    do_winCC: bool = False
+    do_PH: bool = True
     # =========================
     # WinCC
     # =========================
     if do_winCC:
-        endpoint_wincc  = "opc.tcp://VMSRV01:4862"
-        node_id_wincc   = r"ns=1;s=v|09_SaWasser\KomWinCC_MWA_560B5"
+        endpoint_wincc = "opc.tcp://VMSRV01:4862"
+        node_id_wincc = r"ns=1;s=v|09_SaWasser\KomWinCC_MWA_560B5"
 
         r = WinCCOpcUaReader(endpoint_wincc)
         try:
@@ -20,14 +18,9 @@ if __name__ == "__main__":
         finally:
             r.disconnect()
 
-
     # =========================
     # PH
     # =========================
 
     if do_PH:
-        from src.app.logic.process_historian_runner import ProcessHistorianRunner
         ProcessHistorianRunner().run(debug=True)
-
-
-

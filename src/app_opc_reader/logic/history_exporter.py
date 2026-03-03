@@ -1,11 +1,10 @@
 import csv
 import json
 import re
-from dataclasses import asdict
 from pathlib import Path
 from typing import List, Optional
 
-from src.app.logic.helper import project_root, HistoryValue
+from src.app_opc_reader.logic.helper import repo_root, HistoryValue
 
 
 def _sanitize_filename(s: str) -> str:
@@ -23,9 +22,9 @@ def _format_utc(ts) -> Optional[str]:
 
 
 class HistoryDataExporter:
-    def __init__(self, data_dir: Optional[Path] = None) -> None:
-        root = project_root()
-        self.data_dir = (data_dir or (root / "data")).resolve()
+    def __init__(self) -> None:
+        root = repo_root()
+        self.data_dir = (root / "data").resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -73,21 +72,22 @@ class HistoryDataExporter:
             json.dump(payload, f, ensure_ascii=False, indent=2)
 
     def export(
-        self,
-        tag_description: str,
-        start_utc,
-        end_utc,
-        values: List[HistoryValue],
-        write_csv: bool = True,
-        write_json: bool = True,
-        extra_meta: Optional[dict] = None,
+            self,
+            tag_description: str,
+            start_utc,
+            end_utc,
+            values: List[HistoryValue],
+            write_csv: bool = True,
+            write_json: bool = True,
+            extra_meta: Optional[dict] = None,
     ) -> dict:
         basename = self.build_basename(tag_description, start_utc, end_utc)
 
         csv_path = self.data_dir / f"{basename}.csv"
         json_path = self.data_dir / f"{basename}.json"
 
-        meta = {"tag_description": tag_description, "start_utc": _format_utc(start_utc), "end_utc": _format_utc(end_utc)}
+        meta = {"tag_description": tag_description, "start_utc": _format_utc(start_utc),
+                "end_utc": _format_utc(end_utc)}
         if extra_meta:
             meta.update(extra_meta)
 

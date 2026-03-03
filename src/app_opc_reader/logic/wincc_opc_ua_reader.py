@@ -46,11 +46,12 @@ class WinCCOpcUaReader:
         except Exception as ex:
             print(f"[WARN] Fehler beim Trennen: {ex}")
 
-    def _read_attr_int(self, node, attr_id: ua.AttributeIds) -> int | None:
+    @staticmethod
+    def _read_attr_int(node, attr_id: ua.AttributeIds) -> int | None:
         try:
             dv = node.get_attribute(attr_id)
             return dv.Value.Value
-        except Exception:
+        except (Exception,):
             return None
 
     def read_access_info(self, node) -> AccessInfo:
@@ -58,7 +59,8 @@ class WinCCOpcUaReader:
         ual = self._read_attr_int(node, ua.AttributeIds.UserAccessLevel)
         return AccessInfo(al, ual)
 
-    def read_current_value(self, node) -> None:
+    @staticmethod
+    def read_current_value(node) -> None:
         dv = node.get_data_value()
         val = dv.Value.Value if dv.Value is not None else None
         print("\n--- Current Value ---")
@@ -67,7 +69,8 @@ class WinCCOpcUaReader:
         print(f"SourceTimestamp : {dv.SourceTimestamp}")
         print(f"ServerTimestamp : {dv.ServerTimestamp}")
 
-    def read_history(self, node, minutes_back: int = 60, max_values: int = 20) -> None:
+    @staticmethod
+    def read_history(node, minutes_back: int = 60, max_values: int = 20) -> None:
         # WinCC liefert Historie nur, wenn Archivierung/History für den Tag existiert und HistoryRead erlaubt ist.
         end = datetime.now(timezone.utc)
         start = end - timedelta(minutes=minutes_back)
@@ -94,7 +97,7 @@ class WinCCOpcUaReader:
         print(f"NodeClass   : {node.get_node_class()}")
         try:
             print(f"Description : {node.get_description()}")
-        except Exception:
+        except (Exception,):
             pass
 
         # AccessLevel auswerten (entscheidend bei WinCC)
@@ -115,6 +118,3 @@ class WinCCOpcUaReader:
                 print("[ERROR] Weder CurrentRead noch HistoryRead erlaubt – Server/Tag-Rechte prüfen.")
 
         print("=====================================\n")
-
-
-
