@@ -33,29 +33,29 @@ class SiemensHistorianOpcUaClient:
     """
 
     def __init__(
-        self,
-        endpoint_url:          str,
-        username:              str,
-        password:              str,
-        pki_dir:               Path,
-        application_uri:       str,
-        security_policy:       str = "Basic128Rsa15",
-        message_security_mode: str = "SignAndEncrypt",
-        timeout_s:             int = 30,
+            self,
+            endpoint_url: str,
+            username: str,
+            password: str,
+            pki_dir: Path,
+            application_uri: str,
+            security_policy: str = "Basic128Rsa15",
+            message_security_mode: str = "SignAndEncrypt",
+            timeout_s: int = 30,
     ) -> None:
         if not application_uri:
             raise ValueError("application_uri must not be empty")
 
-        self.endpoint_url    = endpoint_url
-        self.username        = username
-        self.password        = password
-        self.timeout_s       = timeout_s
-        self.pki_dir         = Path(pki_dir).resolve()
+        self.endpoint_url = endpoint_url
+        self.username = username
+        self.password = password
+        self.timeout_s = timeout_s
+        self.pki_dir = Path(pki_dir).resolve()
         self.application_uri = application_uri
 
-        self.client_cert_path = self.pki_dir / "own" / "certs"   / "client_cert.der"
-        self.client_key_path  = self.pki_dir / "own" / "private" / "client_key.pem"
-        self.security_string  = (
+        self.client_cert_path = self.pki_dir / "own" / "certs" / "client_cert.der"
+        self.client_key_path = self.pki_dir / "own" / "private" / "client_key.pem"
+        self.security_string = (
             f"{security_policy},{message_security_mode},"
             f"{self.client_cert_path},{self.client_key_path}"
         )
@@ -65,7 +65,7 @@ class SiemensHistorianOpcUaClient:
 
     def _ensure_pki_folders(self) -> None:
         for sub in (
-            "own/certs", "own/private", "trusted/certs", "rejected/certs"
+                "own/certs", "own/private", "trusted/certs", "rejected/certs"
         ):
             (self.pki_dir / sub).mkdir(parents=True, exist_ok=True)
 
@@ -77,11 +77,11 @@ class SiemensHistorianOpcUaClient:
     def _cert_has_app_uri(cert_der: bytes, app_uri: str) -> bool:
         try:
             cert = x509.load_der_x509_certificate(cert_der)
-            san  = cert.extensions.get_extension_for_class(
+            san = cert.extensions.get_extension_for_class(
                 x509.SubjectAlternativeName).value
             return app_uri in san.get_values_for_type(
                 x509.UniformResourceIdentifier)
-        except Exception:
+        except (Exception,):
             return False
 
     def ensure_client_certificate(self) -> Tuple[Path, Path]:
@@ -95,9 +95,9 @@ class SiemensHistorianOpcUaClient:
             self.client_cert_path.unlink(missing_ok=True)
             self.client_key_path.unlink(missing_ok=True)
 
-        key      = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        name     = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME,       "Python OPC UA Client"),
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, "Python OPC UA Client"),
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Local"),
         ])
         now_naive = aware_utc_now().replace(tzinfo=None)
@@ -108,7 +108,7 @@ class SiemensHistorianOpcUaClient:
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
             .not_valid_before(now_naive - dt.timedelta(minutes=5))
-            .not_valid_after (now_naive + dt.timedelta(days=3650))
+            .not_valid_after(now_naive + dt.timedelta(days=3650))
             .add_extension(
                 x509.SubjectAlternativeName(
                     [x509.UniformResourceIdentifier(self.application_uri)]),
@@ -167,17 +167,17 @@ class SiemensHistorianOpcUaClient:
     # -- Single history page -------------------------------------------------
 
     async def _read_raw(
-        self,
-        node_id:       str,
-        start_utc:     dt.datetime,
-        end_utc:       dt.datetime,
-        num_values:    int  = 0,
-        return_bounds: bool = False,
+            self,
+            node_id: str,
+            start_utc: dt.datetime,
+            end_utc: dt.datetime,
+            num_values: int = 0,
+            return_bounds: bool = False,
     ) -> List[HistoryValue]:
         if self._client is None:
             raise RuntimeError("Not connected.")
         node = self._client.get_node(node_id)
-        dvs  = await node.read_raw_history(
+        dvs = await node.read_raw_history(
             starttime=to_naive_utc(start_utc),
             endtime=to_naive_utc(end_utc),
             numvalues=num_values,
@@ -196,12 +196,12 @@ class SiemensHistorianOpcUaClient:
     # -- Paginated history ---------------------------------------------------
 
     async def read_history_paged(
-        self,
-        node_id:    str,
-        start_utc:  dt.datetime,
-        end_utc:    dt.datetime,
-        page_size:  int = 10_000,
-        max_pages:  int = 100_000,
+            self,
+            node_id: str,
+            start_utc: dt.datetime,
+            end_utc: dt.datetime,
+            page_size: int = 10_000,
+            max_pages: int = 100_000,
     ) -> List[HistoryValue]:
         """
         Fetch the full history for [start_utc, end_utc] using automatic paging.
@@ -216,12 +216,12 @@ class SiemensHistorianOpcUaClient:
         condition — a server may return fewer items mid-stream.
         """
         start = ensure_aware_utc(start_utc)
-        end   = ensure_aware_utc(end_utc)
+        end = ensure_aware_utc(end_utc)
 
-        all_values:    List[HistoryValue]    = []
-        current_start: dt.datetime           = start
-        last_ts:       Optional[dt.datetime] = None
-        page_idx:      int                   = 0
+        all_values: List[HistoryValue] = []
+        current_start: dt.datetime = start
+        last_ts: Optional[dt.datetime] = None
+        page_idx: int = 0
 
         while page_idx < max_pages:
             if current_start > end:
@@ -243,7 +243,7 @@ class SiemensHistorianOpcUaClient:
                 batch = [
                     hv for hv in batch
                     if hv.source_timestamp is not None
-                    and ensure_aware_utc(hv.source_timestamp) > last_ts
+                       and ensure_aware_utc(hv.source_timestamp) > last_ts
                 ]
                 if not batch:
                     break
@@ -260,9 +260,9 @@ class SiemensHistorianOpcUaClient:
             if new_last_ts is None or (last_ts is not None and new_last_ts <= last_ts):
                 break
 
-            last_ts       = new_last_ts
+            last_ts = new_last_ts
             current_start = last_ts
-            page_idx     += 1
+            page_idx += 1
 
             print(
                 f"  [page {page_idx:>4}]  "
@@ -321,21 +321,21 @@ class ProcessHistorianReader:
     """
 
     def __init__(
-        self,
-        endpoint_url:          str,
-        node_id:               str,
-        username:              str,
-        password:              str,
-        pki_dir:               Path,
-        application_uri:       str,
-        security_policy:       str = "Basic128Rsa15",
-        message_security_mode: str = "SignAndEncrypt",
-        timeout_s:             int = 30,
+            self,
+            endpoint_url: str,
+            node_id: str,
+            username: str,
+            password: str,
+            pki_dir: Path,
+            application_uri: str,
+            security_policy: str = "Basic128Rsa15",
+            message_security_mode: str = "SignAndEncrypt",
+            timeout_s: int = 30,
     ) -> None:
-        self.node_id    = node_id
-        self._loop      = _LoopRunner()
+        self.node_id = node_id
+        self._loop = _LoopRunner()
         self._connected = False
-        self._client    = SiemensHistorianOpcUaClient(
+        self._client = SiemensHistorianOpcUaClient(
             endpoint_url=endpoint_url,
             username=username,
             password=password,
@@ -386,10 +386,10 @@ class ProcessHistorianReader:
         self._loop.run(self._client.debug_node(self.node_id))
 
     def read_history_paged(
-        self,
-        start_utc: dt.datetime,
-        end_utc:   dt.datetime,
-        page_size: int,
+            self,
+            start_utc: dt.datetime,
+            end_utc: dt.datetime,
+            page_size: int,
     ) -> List[HistoryValue]:
         return self._loop.run(
             self._client.read_history_paged(
@@ -405,7 +405,7 @@ class ProcessHistorianReader:
         Read a single recent value to determine where the historian
         has data (used by the fallback mechanism).
         """
-        end_utc   = aware_utc_now()
+        end_utc = aware_utc_now()
         start_utc = end_utc - dt.timedelta(minutes=probe_minutes)
         hist = self._loop.run(
             self._client._read_raw(

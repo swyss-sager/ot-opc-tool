@@ -20,14 +20,12 @@
         "node_id": "ns=4;b=4YLeF50TiUa37N4P8UnzPY0GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACm0yC56pZ0RZeVuxSOVFGMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAA=="
       }
     ],
-
     "range": {
       "mode": "absolute",
       "start": "01.02.2026",
       "end": "heute",
       "end_inclusive": true
     },
-
     "fallback": {
       "enabled": false,
       "probe_minutes": 30,
@@ -38,5 +36,23 @@
     "data_dir": "data",
     "write_csv": true,
     "write_json": true
+  },
+  "merger": {
+    "enabled": true,
+    "run_after_export": true,
+    "output_basename": "merged_output",
+    "output_dir": "data/merged",
+    "write_csv": true,
+    "write_json": true,
+    "ts_resolution_ms": 500,
+    "statistics": {
+      "enabled": true,
+      "percentiles": [
+        25,
+        50,
+        75,
+        95
+      ]
+    }
   }
 }

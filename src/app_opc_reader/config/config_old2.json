@@ -8,14 +8,12 @@
     "message_security_mode": "SignAndEncrypt",
     "timeout_s": 30,
     "page_size": 10000,
-
     "range": {
       "mode": "absolute",
       "start": "01.02.2026",
       "end": "heute",
       "end_inclusive": true
     },
-
     "fallback": {
       "enabled": false,
       "probe_minutes": 30,

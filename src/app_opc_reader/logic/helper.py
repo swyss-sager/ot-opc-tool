@@ -19,8 +19,8 @@ class HistoryValue:
     """Single historian data point returned from OPC UA."""
     source_timestamp: Optional[dt.datetime]
     server_timestamp: Optional[dt.datetime]
-    value:            Any
-    status_code:      str
+    value: Any
+    status_code: str
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +75,8 @@ def load_env_file() -> Dict[str, str]:
     Lines starting with '#' and blank lines are ignored.
     Surrounding quotes on values are stripped.
     """
-    env:  Dict[str, str] = {}
-    path: Path           = (repo_root() / "security" / ".env").resolve()
+    env: Dict[str, str] = {}
+    path: Path = (repo_root() / "security" / ".env").resolve()
 
     if not path.exists():
         raise FileNotFoundError(f".env not found: {path}")
@@ -86,7 +86,7 @@ def load_env_file() -> Dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        key   = key.strip()
+        key = key.strip()
         value = value.strip()
         if len(value) >= 2 and value[0] in ('"', "'") and value[0] == value[-1]:
             value = value[1:-1]
@@ -132,18 +132,18 @@ def _parse_de_datetime(s: str, tz: dt.timezone) -> Tuple[dt.datetime, bool]:
         )
 
     day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    hh  = int(m.group(4)) if m.group(4) else 0
-    min_= int(m.group(5)) if m.group(5) else 0
+    hh = int(m.group(4)) if m.group(4) else 0
+    min_ = int(m.group(5)) if m.group(5) else 0
     sec = int(m.group(6)) if m.group(6) else 0
 
     return dt.datetime(year, month, day, hh, min_, sec, tzinfo=tz), m.group(4) is not None
 
 
 def parse_absolute_range(
-    start_text:       str,
-    end_text:         str,
-    end_inclusive:    bool  = True,
-    utc_offset_hours: float = 0.0,
+        start_text: str,
+        end_text: str,
+        end_inclusive: bool = True,
+        utc_offset_hours: float = 0.0,
 ) -> Tuple[dt.datetime, dt.datetime]:
     """
     Parse start/end as local time and return both as UTC.
@@ -153,14 +153,14 @@ def parse_absolute_range(
     """
     tz = local_tz(utc_offset_hours)
 
-    start_local, _           = _parse_de_datetime(start_text, tz)
-    end_local,   end_has_time = _parse_de_datetime(end_text,   tz)
+    start_local, _ = _parse_de_datetime(start_text, tz)
+    end_local, end_has_time = _parse_de_datetime(end_text, tz)
 
     if end_inclusive and not end_has_time:
         end_local = end_local.replace(hour=23, minute=59, second=59, microsecond=999_999)
 
     start_utc = start_local.astimezone(dt.timezone.utc)
-    end_utc   = end_local.astimezone(dt.timezone.utc)
+    end_utc = end_local.astimezone(dt.timezone.utc)
 
     if start_utc > end_utc:
         raise ValueError(

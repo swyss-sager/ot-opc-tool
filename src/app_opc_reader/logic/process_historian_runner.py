@@ -1,6 +1,7 @@
 # ---------------------------------------------------------------------------
 # Orchestrates config loading, time-range computation, OPC UA reads
 # and file export for all configured tags in one session.
+# Optionally triggers the data merger directly after export.
 # ---------------------------------------------------------------------------
 
 import datetime as dt
@@ -34,13 +35,9 @@ class ProcessHistorianRunner:
     def _compute_range(
         ph_cfg: Dict[str, Any]
     ) -> Tuple[dt.datetime, dt.datetime]:
-        """
-        Resolve start/end UTC datetimes from config.
-        Supports modes: 'last_minutes', 'absolute'.
-        """
-        r              = ph_cfg.get("range", {"mode": "last_minutes", "last_minutes": 1440})
-        mode           = r.get("mode", "last_minutes")
-        utc_offset     = float(ph_cfg.get("utc_offset_hours", 0.0))
+        r          = ph_cfg.get("range", {"mode": "last_minutes", "last_minutes": 1440})
+        mode       = r.get("mode", "last_minutes")
+        utc_offset = float(ph_cfg.get("utc_offset_hours", 0.0))
 
         if mode == "last_minutes":
             minutes = int(r.get("last_minutes", 1440))
@@ -71,16 +68,11 @@ class ProcessHistorianRunner:
 
     @staticmethod
     def _get_tags(ph_cfg: Dict[str, Any]) -> List[Dict[str, str]]:
-        """
-        Return the tag list from config.
-        Supports both the new 'tags' array and the legacy single-tag format.
-        """
         if "tags" in ph_cfg:
             tags = ph_cfg["tags"]
             if not tags:
                 raise ValueError("config.json: 'tags' array is empty.")
             return tags
-
         node_id  = ph_cfg.get("node_id")
         tag_desc = ph_cfg.get("tag_description", "tag")
         if not node_id:
@@ -98,10 +90,6 @@ class ProcessHistorianRunner:
         page_size: int,
         debug:     bool,
     ) -> Tuple[List, Optional[dt.datetime], Optional[dt.datetime]]:
-        """
-        Probe the historian for the most recent value and read
-        a symmetric window around it.  Returns (values, start, end).
-        """
         hv = reader.probe_last_value(
             probe_minutes=int(fb_cfg.get("probe_minutes", 30))
         )
@@ -116,15 +104,48 @@ class ProcessHistorianRunner:
             return values, fb_start, fb_end
         return [], None, None
 
+    # -- Merger integration --------------------------------------------------
+
+    @staticmethod
+    def _run_merger(
+        merger_cfg:  Dict[str, Any],
+        export_results: List[Dict[str, Any]],
+        debug: bool,
+    ) -> None:
+        """
+        Trigger the data merger after a successful OPC export.
+        Passes exported file paths as input_files so no re-read
+        from config is required.
+        """
+        # Late import — keeps opc_reader independent if merger is absent.
+        from src.app_data_merger.logic.merger_runner import MergerRunner
+
+        # Build input_files from export results
+        input_files = []
+        for r in export_results:
+            if r.get("csv_path"):
+                input_files.append({
+                    "path":   r["csv_path"],
+                    "column": r["tag"],
+                    "format": "csv",
+                })
+
+        if not input_files:
+            print("[merger]  no exported files found — skipping merge")
+            return
+
+        # Inject input_files into a copy of the merger config
+        inline_cfg = {"merger": {**merger_cfg, "input_files": input_files}}
+
+        runner = MergerRunner(inline_cfg=inline_cfg)
+        runner.run(debug=debug)
+
     # -- Main ----------------------------------------------------------------
 
     def run(self, debug: bool = True) -> List[Dict[str, Any]]:
-        """
-        Connect once, iterate over all configured tags, export each to
-        its own CSV / JSON file.  Returns a list of export result dicts.
-        """
         ph_cfg: Dict[str, Any] = self.cfg["process_historian"]
         ex_cfg: Dict[str, Any] = self.cfg.get("export", {})
+        merger_cfg              = self.cfg.get("merger", {})
 
         tags             = self._get_tags(ph_cfg)
         page_size        = int(ph_cfg.get("page_size", 10_000))
@@ -163,10 +184,9 @@ class ProcessHistorianRunner:
             for idx, tag_cfg in enumerate(tags):
                 node_id  = tag_cfg["node_id"]
                 tag_desc = tag_cfg.get("tag_description", f"tag_{idx}")
-
                 reader.node_id = node_id
 
-                print(f"{'─' * 60}")
+                print(f"{'─' * 62}")
                 print(f"[{idx + 1}/{len(tags)}]  {tag_desc}")
                 if debug:
                     print(f"  node_id : {node_id[:72]}...")
@@ -206,9 +226,18 @@ class ProcessHistorianRunner:
 
                 results.append(out)
 
-        print(f"\n{'=' * 60}")
+        print(f"\n{'=' * 62}")
         print(f"[done]  {len(results)} tag(s) exported")
         for r in results:
-            print(f"  {r['tag']:<30}  {r['count']:>8} values")
+            print(f"  {r['tag']:<32}  {r['count']:>8} values")
+
+        # -- Merger ----------------------------------------------------------
+        merger_enabled      = bool(merger_cfg.get("enabled", False))
+        run_after_export    = bool(merger_cfg.get("run_after_export", False))
+
+        if merger_enabled and run_after_export:
+            print(f"\n{'─' * 62}")
+            print("[merger]  starting post-export merge ...")
+            self._run_merger(merger_cfg, results, debug)
 
         return results

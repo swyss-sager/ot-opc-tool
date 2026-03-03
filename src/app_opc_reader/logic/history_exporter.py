@@ -51,7 +51,7 @@ def _to_local(ts: Optional[dt.datetime], utc_offset_hours: float) -> Optional[st
     """Convert a UTC-aware (or naive-UTC) datetime to local ISO string."""
     if ts is None:
         return None
-    tz     = dt.timezone(dt.timedelta(hours=utc_offset_hours))
+    tz = dt.timezone(dt.timedelta(hours=utc_offset_hours))
     ts_utc = ts if ts.tzinfo else ts.replace(tzinfo=dt.timezone.utc)
     return ts_utc.astimezone(tz).isoformat()
 
@@ -71,10 +71,10 @@ class HistoryDataExporter:
 
     @staticmethod
     def build_basename(
-        tag_description: str,
-        start_utc:       Optional[dt.datetime],
-        end_utc:         Optional[dt.datetime],
-        export_utc:      Optional[dt.datetime] = None,
+            tag_description: str,
+            start_utc: Optional[dt.datetime],
+            end_utc: Optional[dt.datetime],
+            export_utc: Optional[dt.datetime] = None,
     ) -> str:
         """
         Build the base filename (without extension).
@@ -93,9 +93,9 @@ class HistoryDataExporter:
 
     @staticmethod
     def write_csv(
-        path: Path,
-        values: List[HistoryValue],
-        utc_offset_hours: float = 0.0,
+            path: Path,
+            values: List[HistoryValue],
+            utc_offset_hours: float = 0.0,
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", newline="", encoding="utf-8") as f:
@@ -111,21 +111,21 @@ class HistoryDataExporter:
 
     @staticmethod
     def write_json(
-        path: Path,
-        values: List[HistoryValue],
-        meta: Dict[str, Any],
-        utc_offset_hours: float = 0.0,
+            path: Path,
+            values: List[HistoryValue],
+            meta: Dict[str, Any],
+            utc_offset_hours: float = 0.0,
     ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "meta":   meta,
-            "count":  len(values),
+            "meta": meta,
+            "count": len(values),
             "values": [
                 {
                     "source_timestamp": _to_local(v.source_timestamp, utc_offset_hours),
                     "server_timestamp": _to_local(v.server_timestamp, utc_offset_hours),
-                    "value":            v.value,
-                    "status_code":      v.status_code,
+                    "value": v.value,
+                    "status_code": v.status_code,
                 }
                 for v in values
             ],
@@ -136,28 +136,28 @@ class HistoryDataExporter:
     # -- Public API ----------------------------------------------------------
 
     def export(
-        self,
-        tag_description:  str,
-        start_utc:        Optional[dt.datetime],
-        end_utc:          Optional[dt.datetime],
-        values:           List[HistoryValue],
-        write_csv:        bool  = True,
-        write_json:       bool  = True,
-        utc_offset_hours: float = 0.0,
-        extra_meta:       Optional[Dict[str, Any]] = None,
+            self,
+            tag_description: str,
+            start_utc: Optional[dt.datetime],
+            end_utc: Optional[dt.datetime],
+            values: List[HistoryValue],
+            write_csv: bool = True,
+            write_json: bool = True,
+            utc_offset_hours: float = 0.0,
+            extra_meta: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         timestamp_format: str = "%Y-%m-%d_%H-%M-%S"
         ts = dt.datetime.now().strftime(timestamp_format)
-        basename   = self.build_basename(tag_description, start_utc, end_utc)
+        basename = self.build_basename(tag_description, start_utc, end_utc)
 
-        csv_path  = self.data_dir / f"{basename}__{ts}.csv"
+        csv_path = self.data_dir / f"{basename}__{ts}.csv"
         json_path = self.data_dir / f"{basename}__{ts}.json"
 
         meta: Dict[str, Any] = {
             "tag_description": tag_description,
-            "start_utc":       _fmt_iso(start_utc),
-            "end_utc":         _fmt_iso(end_utc),
-            "exported_utc":    ts,
+            "start_utc": _fmt_iso(start_utc),
+            "end_utc": _fmt_iso(end_utc),
+            "exported_utc": ts,
             "utc_offset_hours": utc_offset_hours,
         }
         if extra_meta:
@@ -169,8 +169,8 @@ class HistoryDataExporter:
             self.write_json(json_path, values, meta, utc_offset_hours)
 
         return {
-            "tag":       tag_description,
-            "csv_path":  str(csv_path)  if write_csv  else None,
+            "tag": tag_description,
+            "csv_path": str(csv_path) if write_csv else None,
             "json_path": str(json_path) if write_json else None,
-            "count":     len(values),
+            "count": len(values),
         }

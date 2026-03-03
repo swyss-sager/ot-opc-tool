@@ -8,7 +8,7 @@ from src.app_opc_reader.logic.wincc_opc_ua_reader import WinCCOpcUaReader
 if __name__ == "__main__":
 
     RUN_WINCC = False
-    RUN_PH    = True
+    RUN_PH = True
 
     # -- WinCC ---------------------------------------------------------------
     if RUN_WINCC:

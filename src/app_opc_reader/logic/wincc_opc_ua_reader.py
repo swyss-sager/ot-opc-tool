@@ -19,16 +19,16 @@ from opcua import Client, ua
 @dataclass
 class AccessInfo:
     """Decoded OPC UA AccessLevel / UserAccessLevel bit fields."""
-    access_level:      Optional[int]
+    access_level: Optional[int]
     user_access_level: Optional[int]
 
     @staticmethod
     def _flags(v: int) -> dict:
         return {
-            "CurrentRead":    bool(v & 0x01),
-            "CurrentWrite":   bool(v & 0x02),
-            "HistoryRead":    bool(v & 0x04),
-            "HistoryWrite":   bool(v & 0x08),
+            "CurrentRead": bool(v & 0x01),
+            "CurrentWrite": bool(v & 0x02),
+            "HistoryRead": bool(v & 0x04),
+            "HistoryWrite": bool(v & 0x08),
             "SemanticChange": bool(v & 0x10),
         }
 
@@ -64,7 +64,7 @@ class WinCCOpcUaReader:
 
     def __init__(self, endpoint_url: str, timeout_s: int = 5) -> None:
         self.endpoint_url = endpoint_url
-        self.client       = Client(endpoint_url, timeout=timeout_s)
+        self.client = Client(endpoint_url, timeout=timeout_s)
 
     # -- Connection ----------------------------------------------------------
 
@@ -85,20 +85,20 @@ class WinCCOpcUaReader:
     def _read_int_attr(node, attr_id: ua.AttributeIds) -> Optional[int]:
         try:
             return node.get_attribute(attr_id).Value.Value
-        except Exception:
+        except (Exception,):
             return None
 
     def _read_access_info(self, node) -> AccessInfo:
         return AccessInfo(
-            access_level=      self._read_int_attr(node, ua.AttributeIds.AccessLevel),
-            user_access_level= self._read_int_attr(node, ua.AttributeIds.UserAccessLevel),
+            access_level=self._read_int_attr(node, ua.AttributeIds.AccessLevel),
+            user_access_level=self._read_int_attr(node, ua.AttributeIds.UserAccessLevel),
         )
 
     # -- Reads ---------------------------------------------------------------
 
     @staticmethod
     def _print_current_value(node) -> None:
-        dv  = node.get_data_value()
+        dv = node.get_data_value()
         val = dv.Value.Value if dv.Value is not None else None
         print("\n--- current value ---")
         print(f"  value            : {val!r}")
@@ -108,13 +108,13 @@ class WinCCOpcUaReader:
 
     @staticmethod
     def _print_history(
-        node,
-        minutes_back: int = 60,
-        max_values:   int = 20,
+            node,
+            minutes_back: int = 60,
+            max_values: int = 20,
     ) -> None:
-        end   = dt.datetime.now(dt.timezone.utc)
+        end = dt.datetime.now(dt.timezone.utc)
         start = end - dt.timedelta(minutes=minutes_back)
-        dvs   = node.read_raw_history(starttime=start, endtime=end)
+        dvs = node.read_raw_history(starttime=start, endtime=end)
 
         print(f"\n--- history (last {minutes_back} min, max {max_values}) ---")
         if not dvs:
@@ -127,11 +127,11 @@ class WinCCOpcUaReader:
     # -- Public API ----------------------------------------------------------
 
     def read_tag_wincc(
-        self,
-        node_id:              str,
-        history_minutes_back: int = 60,
+            self,
+            node_id: str,
+            history_minutes_back: int = 60,
     ) -> None:
-        node   = self.client.get_node(node_id)
+        node = self.client.get_node(node_id)
         access = self._read_access_info(node)
 
         print("\n===== WinCC OPC UA tag =====")
@@ -141,7 +141,7 @@ class WinCCOpcUaReader:
         print(f"  node_class   : {node.get_node_class()}")
         try:
             print(f"  description  : {node.get_description()}")
-        except Exception:
+        except (Exception,):
             pass
         print(f"  access       : {access.pretty()}")
 

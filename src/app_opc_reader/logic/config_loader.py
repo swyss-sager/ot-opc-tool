@@ -3,7 +3,6 @@
 # ---------------------------------------------------------------------------
 
 import json
-from pathlib import Path
 from typing import Any, Dict
 
 from src.app_opc_reader.logic.helper import project_root
