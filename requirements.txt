@@ -1,3 +1,14 @@
 opcua~=0.98.13
 asyncua~=1.1.8
 cryptography~=46.0.5
+pulp
+pandas
+scikit-learn
+statsmodels
+matplotlib
+seaborn
+scipy
+pandas
+scipy
+numpy
+prophet

@@ -1,7 +1,5 @@
 # ---------------------------------------------------------------------------
 # Root entry point — runs all configured components in sequence.
-# Each component can be toggled independently via boolean flags.
-# Individual components are also directly executable via their own main.py.
 # ---------------------------------------------------------------------------
 
 import sys
@@ -11,40 +9,36 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 # ---------------------------------------------------------------------------
-# Component flags  — set to True / False as needed
+# Component flags
 # ---------------------------------------------------------------------------
 
-RUN_OPC_READER = True    # src/app_opc_reader  — reads from Process Historian
-RUN_MERGER     = False   # src/app_data_merger — standalone merge (no OPC read)
-                         # Note: merger also runs automatically after OPC read
-                         # when merger.enabled=true & run_after_export=true
-                         # in config.json — no need to enable both.
+RUN_OPC_READER = True
+RUN_MERGER     = False
+RUN_ANALYZER   = True   # New: src/app_data_analyzer
 
-
-# ---------------------------------------------------------------------------
-# Runner
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     print("\n" + "=" * 62)
     print("  PIPELINE START")
     print("=" * 62)
 
-    # -- OPC Reader ----------------------------------------------------------
     if RUN_OPC_READER:
         print("\n[component]  app_opc_reader")
         print("─" * 62)
-        from src.app_opc_reader.logic.process_historian_runner import (
-            ProcessHistorianRunner,
-        )
+        from src.app_opc_reader.logic.process_historian_runner import ProcessHistorianRunner
         ProcessHistorianRunner().run(debug=True)
 
-    # -- Standalone Merger ---------------------------------------------------
     if RUN_MERGER:
         print("\n[component]  app_data_merger  (standalone)")
         print("─" * 62)
         from src.app_data_merger.logic.merger_runner import MergerRunner
         MergerRunner().run(debug=True)
+
+    if RUN_ANALYZER:
+        print("\n[component]  app_data_analyzer")
+        print("─" * 62)
+        from src.app_data_analyzer.logic.analyzer_runner import AnalyzerRunner
+        AnalyzerRunner().run(debug=True)
 
     print("\n" + "=" * 62)
     print("  PIPELINE COMPLETE")

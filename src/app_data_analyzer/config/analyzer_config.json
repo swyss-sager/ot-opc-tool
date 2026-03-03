@@ -1,0 +1,53 @@
+{
+  "analyzer": {
+    "input_files": [
+      {
+        "path": "data/merged/merged_output_2026-03-03T13_32_23.42.csv",
+        "format": "csv"
+      }
+    ],
+    "output_dir": "data/analyzer/_output",
+    "plots_dir": "data/analyzer/analyzer_plots",
+    "write_report_json": true,
+    "run_descriptive": true,
+    "run_exploratory": true,
+    "run_diagnostic": true,
+    "run_inferential": true,
+    "run_predictive": true,
+    "run_prescriptive": true,
+    "run_patterns": true,
+    "analyses": {
+      "descriptive": {
+        "percentiles": [25, 50, 75, 95]
+      },
+      "exploratory": {
+        "plot_correlations": true,
+        "plot_distributions": true,
+        "handle_missing": "drop"
+      },
+      "diagnostic": {
+        "feature_importance": true,
+        "granger_causality": true
+      },
+      "inferential": {
+        "hypothesis_tests": ["t_test", "chi_square"]
+      },
+      "predictive": {
+        "forecast_horizon": 24,
+        "anomaly_detection": true,
+        "maintenance_model": "trend_threshold",
+        "classification_target": "Anomalie"
+      },
+      "prescriptive": {
+        "optimization": true,
+        "alert_thresholds": {
+          "Aussen-Temperatur": {"min": -10, "max": 50}
+        }
+      },
+      "patterns": {
+        "clustering_n_clusters": 3,
+        "sequence_window": 10
+      }
+    }
+  }
+}

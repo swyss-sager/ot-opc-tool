@@ -138,6 +138,8 @@ class MergerRunner:
             if debug:
                 print_stats(stats)
 
+
+
         # -- Export ----------------------------------------------------------
         export_result = export_merged(
             series=series,
