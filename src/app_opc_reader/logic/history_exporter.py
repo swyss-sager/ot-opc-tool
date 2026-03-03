@@ -125,17 +125,18 @@ class HistoryDataExporter:
             write_json: bool = True,
             extra_meta: Optional[dict] = None,
     ) -> dict:
-        export_utc = dt.datetime.now(dt.timezone.utc)
-        basename   = self.build_basename(tag_description, start_utc, end_utc, export_utc)
+        timestamp_format: str = "%Y-%m-%d_%H-%M-%S"
+        ts = dt.datetime.now().strftime(timestamp_format)
+        basename   = self.build_basename(tag_description, start_utc, end_utc)
 
-        csv_path  = self.data_dir / f"{basename}.csv"
-        json_path = self.data_dir / f"{basename}.json"
+        csv_path  = self.data_dir / f"{basename}__{ts}.csv"
+        json_path = self.data_dir / f"{basename}__{ts}.json"
 
         meta = {
             "tag_description": tag_description,
             "start_utc":       _format_utc(start_utc),
             "end_utc":         _format_utc(end_utc),
-            "exported_utc":    _format_utc(export_utc),
+            "exported_utc":    ts,
         }
         if extra_meta:
             meta.update(extra_meta)
